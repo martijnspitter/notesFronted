@@ -12,7 +12,7 @@ import titleBox from '../images/titleBox.svg';
 import ProgressBar from '../components/ProgressBar';
 
 import { useRecoilState } from 'recoil';
-import { itemAtom } from '../store/atoms';
+import { itemAtom, notesAtom } from '../store/atoms';
 
 import axios from '../api/axios';
 import authHeader from '../api/authHeader';
@@ -22,15 +22,21 @@ import { showClass, hideClass } from '../helpers/helpers';
 
 export default function Item(props) {
 	const [ item, setItem ] = useRecoilState(itemAtom);
+	const [ notes, setNotes ] = useRecoilState(notesAtom);
 
 	const [ description, setDescription ] = useState('');
-
 	const [ title, setTitle ] = useState('');
-
+	const [ areYouSure, setAreYouSure ] = useState(false);
 	// const [ dueDate, setDueDate ] = useState();
 	const [ todoText, setTodoText ] = useState('');
 	const [ message, setMessage ] = useState('');
 	const [ edit, setEdit ] = useState(false);
+
+	// close popup and reset areYouSure
+	const handleClosePopup = () => {
+		setAreYouSure(false);
+		props.onHide();
+	};
 
 	// edit an Item title / description and or duedate (work needed for title and dueDate)
 	const handleSubmit = async (e) => {
@@ -161,6 +167,38 @@ export default function Item(props) {
 		}
 	};
 
+	// delete the whole item
+	const handleDeleteItem = async () => {
+		let requestBody = {
+			query: `mutation {deleteItem(itemId: "${item._id}") {_id}}`
+		};
+
+		const response = await axios.post('', requestBody, { headers: authHeader() });
+
+		if (response.data.data.deleteItem) {
+			// clone state from itemAtom and adding newly created Item
+			const notesCopy = _.cloneDeep(notes);
+
+			// find index of note in notes
+			const noteIndex = notesCopy.findIndex((noteToFind) => noteToFind._id === item.note._id);
+			// find index of item in note
+			const index = notesCopy[noteIndex].items.findIndex((itemToFind) => itemToFind._id === item._id);
+
+			// remove the item with splice
+			notesCopy[noteIndex].items.splice(index, 1);
+
+			// replace old state with mutated state
+			setNotes(notesCopy);
+
+			// close item popup (that clears itemAtom as well) and reset areYouSure
+			handleClosePopup();
+		}
+
+		if (response.data.errors) {
+			setMessage(`ERROR: ${response.data.errors[0].message}`);
+		}
+	};
+
 	// conditional title render for while loading
 	const noteTitleRender = () => {
 		if (!item.note) return 'loading..';
@@ -242,7 +280,7 @@ export default function Item(props) {
 					style={{
 						marginLeft: '3.6rem',
 						backgroundColor: '#f5f5f5',
-						maxWidth: '70%',
+						maxWidth: '75%',
 						minHeight: '5rem',
 						padding: '0 .6rem'
 					}}
@@ -260,6 +298,7 @@ export default function Item(props) {
 						<Form.Control
 							as="textarea"
 							rows="3"
+							size="lg"
 							id="description"
 							required
 							value={description}
@@ -400,7 +439,7 @@ export default function Item(props) {
 	};
 
 	return (
-		<Modal show={props.show} onHide={props.onHide} centered dialogClassName="item-modal">
+		<Modal show={props.show} onHide={handleClosePopup} centered dialogClassName="item-modal">
 			<Modal.Header closeButton style={{ padding: '2rem 2rem 2rem 3rem' }}>
 				<div style={{ display: 'flex', flexDirection: 'column', width: '70%' }}>
 					<div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
@@ -422,34 +461,73 @@ export default function Item(props) {
 					{editTitle()}
 				</div>
 			</Modal.Header>
-			<Modal.Body style={{ padding: '2rem 2rem 4rem 3rem' }}>
-				<div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-					<img src={descBox} alt="description box" style={{ marginRight: '1rem', width: '25px', height: '20px' }} />
+			<Modal.Body style={{ padding: '2rem 2rem 4rem 3rem', display: 'flex' }}>
+				<div style={{ display: 'flex', flexDirection: 'column', width: '75%' }}>
+					<div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+						<img src={descBox} alt="description box" style={{ marginRight: '1rem', width: '25px', height: '20px' }} />
 
-					<div style={{ display: 'flex', alignItems: 'center' }}>
-						<h3 style={{ margin: 0 }}>Description</h3>
-						<img
-							src={pencil}
-							alt="pencil"
-							style={{ cursor: 'pointer', margin: '.2rem 0 0 .6rem', width: '12px', height: '12px' }}
-							onClick={() => {
-								setDescription(item.description);
-								toggleEditDiscription(item._id);
-							}}
-						/>
+						<div style={{ display: 'flex', alignItems: 'center' }}>
+							<h3 style={{ margin: 0 }}>Description</h3>
+							<img
+								src={pencil}
+								alt="pencil"
+								style={{ cursor: 'pointer', margin: '.2rem 0 0 .6rem', width: '12px', height: '12px' }}
+								onClick={() => {
+									setDescription(item.description);
+									toggleEditDiscription(item._id);
+								}}
+							/>
+						</div>
 					</div>
-				</div>
-				{descriptionRender(item)}
-				<div style={{ display: 'flex', alignItems: 'center', margin: '2rem 0 1rem 0' }}>
-					<img src={checkListBox} alt="check list box" style={{ marginRight: '1rem', width: '25px', height: '20px' }} />
+					{descriptionRender(item)}
+					<div style={{ display: 'flex', alignItems: 'center', margin: '2rem 0 1rem 0' }}>
+						<img
+							src={checkListBox}
+							alt="check list box"
+							style={{ marginRight: '1rem', width: '25px', height: '20px' }}
+						/>
 
-					<h3 style={{ marginBottom: '0' }}>Checklist</h3>
+						<h3 style={{ marginBottom: '0' }}>Checklist</h3>
+					</div>
+					<div style={{ display: 'flex', flexDirection: 'column', width: '70%', margin: '0 0 2rem 3.6rem' }}>
+						{progressBarRender()}
+					</div>
+					{todoListRender()}
+					{todoListForm()}
 				</div>
-				<div style={{ display: 'flex', flexDirection: 'column', width: '70%', margin: '0 0 2rem 3.6rem' }}>
-					{progressBarRender()}
+				<div
+					style={{
+						display: 'flex',
+						flexDirection: 'column',
+						alignItems: 'center',
+						width: '25%',
+						paddingRight: '1.5rem',
+						paddingTop: '1.5rem'
+					}}
+				>
+					<Button style={{ marginBottom: '1rem', backgroundColor: '#45a3d9', width: '80%', fontSize: '1.5rem' }}>
+						Set DueDate
+					</Button>
+					<Button
+						style={{ marginBottom: '1rem', backgroundColor: '#45a3d9', width: '80%', fontSize: '1.5rem' }}
+						onClick={() => setAreYouSure(true)}
+					>
+						Delete Item
+					</Button>
+					{areYouSure ? (
+						<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+							<div>Are you sure?</div>
+							<div style={{ display: 'flex', justifyContent: 'space-evenly', width: '100%' }}>
+								<Button variant="danger" style={{ fontSize: '1.5rem' }} onClick={() => handleDeleteItem()}>
+									Yes
+								</Button>
+								<Button style={{ backgroundColor: '#45a3d9', fontSize: '1.5rem' }} onClick={() => setAreYouSure(false)}>
+									No
+								</Button>
+							</div>{' '}
+						</div>
+					) : null}
 				</div>
-				{todoListRender()}
-				{todoListForm()}
 			</Modal.Body>
 		</Modal>
 	);

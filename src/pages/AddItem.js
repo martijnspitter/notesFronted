@@ -4,6 +4,7 @@ import axios from '../api/axios';
 import authHeader from '../api/authHeader';
 
 import { Form, Button } from 'react-bootstrap';
+import cross from '../images/cross.svg';
 
 import { useRecoilState } from 'recoil';
 import { notesAtom } from '../store/atoms';
@@ -25,9 +26,8 @@ export default function AddItem(props) {
 		const response = await axios.post('', requestBody, { headers: authHeader() });
 
 		if (response.data.data.createItem) {
-			setMessage(
-				`Note: "${response.data.data.createItem.title}" is created by ${response.data.data.createItem.creator.username}`
-			);
+			setMessage('');
+			setTitle('');
 		}
 		if (response.data.errors) {
 			setMessage(`ERROR: ${response.data.errors[0].message}`);
@@ -73,21 +73,16 @@ export default function AddItem(props) {
 				>
 					Create Item
 				</Button>
-				<svg
-					onClick={() => props.onHide(props.id)}
-					style={{ marginTop: '2rem', cursor: 'pointer' }}
-					width="2em"
-					height="2em"
-					viewBox="0 0 16 16"
-					className="bi bi-x"
-					fill="currentColor"
-					xmlns="http://www.w3.org/2000/svg"
-				>
-					<path
-						fillRule="evenodd"
-						d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"
-					/>
-				</svg>
+				<img
+					src={cross}
+					alt="cross"
+					onClick={() => {
+						props.onHide(props.id);
+						setTitle('');
+						setMessage('');
+					}}
+					style={{ marginTop: '2rem', cursor: 'pointer', width: '2rem', height: '2rem' }}
+				/>
 			</div>
 		</Form>
 	);
